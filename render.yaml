@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: alphapulse-quant-terminal
+    env: python
+    plan: standard
+    buildCommand: pip install -r requirements.txt
+    startCommand: streamlit run app.py --server.port $PORT --server.address 0.0.0.0
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: GEMINI_API_KEY
+        sync: false
