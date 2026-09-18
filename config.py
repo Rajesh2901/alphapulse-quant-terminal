@@ -4,8 +4,7 @@ Centralized settings for market universes, model parameters, API credentials, an
 """
 
 import os
-from dataclasses import dataclass, field
-from typing import Dict, List
+from dataclasses import dataclass
 
 # -----------------------------------------------------------------------------
 # API CREDENTIALS
@@ -14,6 +13,7 @@ GOOGLE_API_KEY = os.getenv("GEMINI_API_KEY", "")
 if not GOOGLE_API_KEY:
     try:
         import streamlit as st
+
         GOOGLE_API_KEY = st.secrets.get("GEMINI_API_KEY", "")
     except Exception:
         GOOGLE_API_KEY = ""
@@ -21,7 +21,7 @@ if not GOOGLE_API_KEY:
 # -----------------------------------------------------------------------------
 # ASSET UNIVERSES
 # -----------------------------------------------------------------------------
-ASSET_UNIVERSES: Dict[str, List[Dict[str, str]]] = {
+ASSET_UNIVERSES: dict[str, list[dict[str, str]]] = {
     "Equities & Tech Titans": [
         {"symbol": "NVDA", "name": "NVIDIA Corporation", "category": "Semiconductors / AI"},
         {"symbol": "AAPL", "name": "Apple Inc.", "category": "Consumer Electronics"},
@@ -67,6 +67,7 @@ TIMEFRAME_OPTIONS = {
 DEFAULT_TIMEFRAME = "1 Day (Positional/Macro)"
 DEFAULT_SYMBOL = "NVDA"
 
+
 # -----------------------------------------------------------------------------
 # MODEL PARAMETERS
 # -----------------------------------------------------------------------------
@@ -77,19 +78,20 @@ class QuantModelConfig:
     auto_arima: bool = True
     max_p: int = 4
     max_q: int = 4
-    
+
     # ML Ensemble settings
     n_estimators: int = 120
     learning_rate: float = 0.05
     max_depth: int = 4
     lags: int = 5
     forecast_horizon: int = 10
-    
+
     # Quantitative Risk Parameters
     risk_free_rate: float = 0.045
     var_confidence_95: float = 0.95
     var_confidence_99: float = 0.99
     trading_days_per_year: int = 252
+
 
 DEFAULT_MODEL_CONFIG = QuantModelConfig()
 

@@ -4,19 +4,21 @@ Econometric ARIMA modeling, Machine Learning Ensemble forecasting, and Multi-Fac
 """
 
 import warnings
-from typing import Dict, Any, Tuple, Optional
+from typing import Any
+
 import numpy as np
 import pandas as pd
 from scipy.stats import norm
+from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+from statsmodels.stats.diagnostic import acorr_ljungbox
 from statsmodels.tsa.arima.model import ARIMA
 from statsmodels.tsa.stattools import adfuller
-from statsmodels.stats.diagnostic import acorr_ljungbox
-from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
-from sklearn.metrics import mean_squared_error, mean_absolute_error
 
 from features import FeatureEngine
 
 warnings.filterwarnings("ignore")
+
 
 class ARIMAForecaster:
     """
@@ -26,20 +28,19 @@ class ARIMAForecaster:
 
     @staticmethod
     def fit_and_forecast(
-        series: pd.Series,
-        horizon: int = 10,
-        order: Tuple[int, int, int] = (2, 1, 2)
-    ) -> Dict[str, Any]:
+        series: pd.Series, horizon: int = 10, order: tuple[int, int, int] = (2, 1, 2)
+    ) -> dict[str, Any]:
         close_prices = series.dropna().astype(float)
         if len(close_prices) < 30:
-            raise ValueError("Insufficient data points for econometric estimation (minimum 30 required).")
+            raise ValueError(
+                "Insufficient data points for econometric estimation (minimum 30 required)."
+            )
 
         log_prices = np.log(close_prices)
 
         # 1. Augmented Dickey-Fuller Stationarity Test
         log_diff = log_prices.diff().dropna()
         adf_res = adfuller(log_diff)
-        adf_stat = float(adf_res[0])
         adf_pvalue = float(adf_res[1])
         is_stationary = adf_pvalue < 0.05
 
@@ -55,7 +56,7 @@ class ARIMAForecaster:
         # 3. Generate out-of-sample forecast
         forecast_res = fitted_model.get_forecast(steps=horizon)
         pred_log_mean = np.asarray(forecast_res.predicted_mean)
-        
+
         conf_int_95 = np.asarray(forecast_res.conf_int(alpha=0.05))
         conf_int_80 = np.asarray(forecast_res.conf_int(alpha=0.20))
 
@@ -96,7 +97,7 @@ class ARIMAForecaster:
             "adf_pvalue": round(adf_pvalue, 4),
             "is_stationary": is_stationary,
             "ljung_box_pvalue": round(lb_pvalue, 4),
-            "residuals": residuals
+            "residuals": residuals,
         }
 
 
@@ -107,18 +108,21 @@ class MLEnsembleForecaster:
     """
 
     def __init__(self, n_estimators: int = 120, max_depth: int = 4):
-        self.rf = RandomForestRegressor(n_estimators=n_estimators, max_depth=max_depth, random_state=42)
-        self.gb = GradientBoostingRegressor(n_estimators=n_estimators, max_depth=max_depth, learning_rate=0.04, random_state=42)
-        self.feature_names = []
-        self.feature_importances_ = {}
+        self.rf = RandomForestRegressor(
+            n_estimators=n_estimators, max_depth=max_depth, random_state=42
+        )
+        self.gb = GradientBoostingRegressor(
+            n_estimators=n_estimators, max_depth=max_depth, learning_rate=0.04, random_state=42
+        )
+        self.feature_names: list[str] = []
+        self.feature_importances_: dict[str, float] = {}
 
     def train_and_predict(
-        self,
-        df: pd.DataFrame,
-        horizon: int = 10,
-        n_lags: int = 5
-    ) -> Dict[str, Any]:
-        X, y, feature_cols = FeatureEngine.build_ml_feature_matrix(df, n_lags=n_lags, target_horizon=1)
+        self, df: pd.DataFrame, horizon: int = 10, n_lags: int = 5
+    ) -> dict[str, Any]:
+        X, y, feature_cols = FeatureEngine.build_ml_feature_matrix(
+            df, n_lags=n_lags, target_horizon=1
+        )
         self.feature_names = feature_cols
 
         if len(X) < 40:
@@ -138,7 +142,7 @@ class MLEnsembleForecaster:
         mse = mean_squared_error(y_test, pred_test)
         rmse = float(np.sqrt(mse))
         mae = float(mean_absolute_error(y_test, pred_test))
-        
+
         actual_direction = np.sign(y_test)
         pred_direction = np.sign(pred_test)
         directional_acc = float(np.mean(actual_direction == pred_direction) * 100.0)
@@ -147,30 +151,31 @@ class MLEnsembleForecaster:
         self.gb.fit(X, y)
 
         importances = 0.5 * (self.rf.feature_importances_ + self.gb.feature_importances_)
-        feat_imp_df = pd.DataFrame({
-            "Feature": feature_cols,
-            "Importance": importances
-        }).sort_values(by="Importance", ascending=False)
+        feat_imp_df = pd.DataFrame(
+            {"Feature": feature_cols, "Importance": importances}
+        ).sort_values(by="Importance", ascending=False)
 
         current_features = X.iloc[-1:].copy()
         current_price = float(df["Close"].iloc[-1])
         predicted_prices = []
         last_price = current_price
-        
+
         resid_std = float(np.std(y - (0.5 * (self.rf.predict(X) + self.gb.predict(X)))))
 
-        for step in range(horizon):
+        for _step in range(horizon):
             pred_ret_rf = float(self.rf.predict(current_features)[0])
             pred_ret_gb = float(self.gb.predict(current_features)[0])
             step_return = 0.5 * (pred_ret_rf + pred_ret_gb)
-            
+
             next_price = last_price * np.exp(step_return)
             predicted_prices.append(next_price)
             last_price = next_price
 
             if "Lag_Return_1" in current_features.columns:
                 for lag in range(n_lags, 1, -1):
-                    current_features[f"Lag_Return_{lag}"] = current_features[f"Lag_Return_{lag-1}"].values
+                    current_features[f"Lag_Return_{lag}"] = current_features[
+                        f"Lag_Return_{lag - 1}"
+                    ].values
                 current_features["Lag_Return_1"] = step_return
 
         last_date = df.index[-1]
@@ -190,7 +195,9 @@ class MLEnsembleForecaster:
             "mae": round(mae, 4),
             "directional_accuracy": round(directional_acc, 1),
             "feature_importance": feat_imp_df,
-            "expected_change_pct": round(((predicted_prices[-1] - current_price) / current_price) * 100.0, 2)
+            "expected_change_pct": round(
+                ((predicted_prices[-1] - current_price) / current_price) * 100.0, 2
+            ),
         }
 
 
@@ -202,10 +209,8 @@ class ConsensusSignalEngine:
 
     @staticmethod
     def generate_consensus_signal(
-        df_features: pd.DataFrame,
-        arima_results: Dict[str, Any],
-        ml_results: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        df_features: pd.DataFrame, arima_results: dict[str, Any], ml_results: dict[str, Any]
+    ) -> dict[str, Any]:
         latest = df_features.iloc[-1]
         score = 0.0
 
@@ -231,7 +236,7 @@ class ConsensusSignalEngine:
         # 2. Momentum Factor (Weight: 20%)
         rsi = latest.get("RSI", 50.0)
         macd_hist = latest.get("MACD_Hist", 0.0)
-        
+
         momentum_subscore = 0.0
         if rsi < 30.0:
             momentum_subscore += 10.0
@@ -316,5 +321,5 @@ class ConsensusSignalEngine:
             "momentum_subscore": round(momentum_subscore, 1),
             "reversion_subscore": round(reversion_subscore, 1),
             "arima_subscore": round(arima_subscore, 1),
-            "ml_subscore": round(ml_subscore, 1)
+            "ml_subscore": round(ml_subscore, 1),
         }

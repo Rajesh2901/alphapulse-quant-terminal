@@ -4,10 +4,12 @@ Value-at-Risk (VaR), Expected Shortfall (CVaR), Cornish-Fisher expansion,
 drawdown analytics, and risk-adjusted performance attribution.
 """
 
-from typing import Dict, Any, Optional
+from typing import Any
+
 import numpy as np
 import pandas as pd
-from scipy.stats import norm, skew, kurtosis
+from scipy.stats import kurtosis, norm, skew
+
 
 class QuantitativeRiskEngine:
     """
@@ -17,10 +19,8 @@ class QuantitativeRiskEngine:
 
     @staticmethod
     def calculate_risk_metrics(
-        returns_series: pd.Series,
-        risk_free_rate: float = 0.045,
-        trading_days: int = 252
-    ) -> Dict[str, Any]:
+        returns_series: pd.Series, risk_free_rate: float = 0.045, trading_days: int = 252
+    ) -> dict[str, Any]:
         r = returns_series.dropna().values
         if len(r) < 10:
             raise ValueError("Insufficient return observations for risk calculation.")
@@ -39,7 +39,9 @@ class QuantitativeRiskEngine:
         sharpe_ratio = float(excess_return / (ann_volatility + 1e-6))
 
         downside_returns = r[r < 0]
-        downside_std_daily = float(np.std(downside_returns, ddof=1)) if len(downside_returns) > 1 else std_daily
+        downside_std_daily = (
+            float(np.std(downside_returns, ddof=1)) if len(downside_returns) > 1 else std_daily
+        )
         ann_downside_vol = float(downside_std_daily * np.sqrt(trading_days))
         sortino_ratio = float(excess_return / (ann_downside_vol + 1e-6))
 
@@ -61,10 +63,10 @@ class QuantitativeRiskEngine:
 
         def cornish_fisher_z(z_crit: float, s: float, k: float) -> float:
             return (
-                z_crit +
-                (z_crit**2 - 1.0) * s / 6.0 +
-                (z_crit**3 - 3.0 * z_crit) * k / 24.0 -
-                (2.0 * z_crit**3 - 5.0 * z_crit) * (s**2) / 36.0
+                z_crit
+                + (z_crit**2 - 1.0) * s / 6.0
+                + (z_crit**3 - 3.0 * z_crit) * k / 24.0
+                - (2.0 * z_crit**3 - 5.0 * z_crit) * (s**2) / 36.0
             )
 
         z_cf_95 = cornish_fisher_z(z_95, skew_val, kurt_val)
@@ -105,10 +107,10 @@ class QuantitativeRiskEngine:
             "kurtosis": round(kurt_val, 2),
             "win_rate_pct": round(win_rate, 1),
             "profit_factor": round(profit_factor, 2),
-            "drawdown_series": dd_series
+            "drawdown_series": dd_series,
         }
 
     @staticmethod
-    def compute_correlation_matrix(asset_returns_dict: Dict[str, pd.Series]) -> pd.DataFrame:
+    def compute_correlation_matrix(asset_returns_dict: dict[str, pd.Series]) -> pd.DataFrame:
         combined_df = pd.DataFrame(asset_returns_dict).dropna()
         return combined_df.corr().round(2)

@@ -1,0 +1,89 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "alphapulse-quant-terminal"
+version = "2.0.0"
+description = "Institutional Quantitative Trading & Predictive Intelligence Terminal"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "AlphaPulse Quantitative Desk", email = "research@alphapulse.internal" }]
+license = { text = "MIT" }
+classifiers = [
+    "Programming Language :: Python :: 3.11",
+    "Operating System :: OS Independent",
+    "Topic :: Office/Business :: Financial :: Investment",
+]
+dependencies = [
+    "streamlit>=1.35.0",
+    "plotly>=5.22.0",
+    "pandas>=2.2.0",
+    "numpy>=1.26.0",
+    "scipy>=1.13.0",
+    "statsmodels>=0.14.0",
+    "scikit-learn>=1.5.0",
+    "yfinance>=0.2.40",
+    "google-genai>=0.1.0",
+    "pydantic>=2.7.0",
+    "requests>=2.31.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.2.0",
+    "pytest-cov>=5.0.0",
+    "ruff>=0.4.0",
+    "mypy>=1.10.0",
+    "bandit>=1.7.8",
+]
+
+# ------------------------------------------------------------------------------
+# RUFF CONFIGURATION
+# ------------------------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+exclude = [".venv", "scratch", "build", "dist"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort imports
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501", # Line length handled by formatter
+    "B008", # Do not perform function calls in argument defaults
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+# ------------------------------------------------------------------------------
+# MYPY CONFIGURATION
+# ------------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = false
+warn_unused_configs = true
+ignore_missing_imports = true
+check_untyped_defs = true
+
+# ------------------------------------------------------------------------------
+# PYTEST CONFIGURATION
+# ------------------------------------------------------------------------------
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-ra -q --strict-markers"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::UserWarning",
+]

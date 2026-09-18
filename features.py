@@ -5,7 +5,7 @@ Calculates statistical rolling metrics, momentum oscillators, volatility bands, 
 
 import numpy as np
 import pandas as pd
-from typing import Tuple, List, Optional
+
 
 class FeatureEngine:
     """
@@ -34,14 +34,16 @@ class FeatureEngine:
         data["BB_Upper"] = data["BB_Mid"] + (2.0 * data["BB_Std"])
         data["BB_Lower"] = data["BB_Mid"] - (2.0 * data["BB_Std"])
         data["BB_Bandwidth"] = (data["BB_Upper"] - data["BB_Lower"]) / (data["BB_Mid"] + 1e-6)
-        data["BB_PctB"] = (data["Close"] - data["BB_Lower"]) / (data["BB_Upper"] - data["BB_Lower"] + 1e-6)
+        data["BB_PctB"] = (data["Close"] - data["BB_Lower"]) / (
+            data["BB_Upper"] - data["BB_Lower"] + 1e-6
+        )
 
         # 4. Relative Strength Index (RSI 14)
         delta = data["Close"].diff()
         gain = delta.clip(lower=0)
         loss = -delta.clip(upper=0)
-        avg_gain = gain.ewm(alpha=1.0/14.0, min_periods=14, adjust=False).mean()
-        avg_loss = loss.ewm(alpha=1.0/14.0, min_periods=14, adjust=False).mean()
+        avg_gain = gain.ewm(alpha=1.0 / 14.0, min_periods=14, adjust=False).mean()
+        avg_loss = loss.ewm(alpha=1.0 / 14.0, min_periods=14, adjust=False).mean()
         rs = avg_gain / (avg_loss + 1e-9)
         data["RSI"] = 100.0 - (100.0 / (1.0 + rs))
 
@@ -61,11 +63,16 @@ class FeatureEngine:
         data["ATR_Pct"] = data["ATR"] / (data["Close"] + 1e-6)
 
         # 7. Realized Volatility (Rolling 20-bar annualized)
-        data["Realized_Vol_20"] = data["Log_Return"].rolling(window=20, min_periods=5).std() * np.sqrt(252)
+        data["Realized_Vol_20"] = data["Log_Return"].rolling(
+            window=20, min_periods=5
+        ).std() * np.sqrt(252)
 
         # 8. On-Balance Volume (OBV)
-        obv_direction = np.where(data["Close"] > data["Close"].shift(1), 1,
-                                np.where(data["Close"] < data["Close"].shift(1), -1, 0))
+        obv_direction = np.where(
+            data["Close"] > data["Close"].shift(1),
+            1,
+            np.where(data["Close"] < data["Close"].shift(1), -1, 0),
+        )
         data["OBV"] = (obv_direction * data["Volume"]).cumsum()
 
         # 9. Volume Moving Average Ratio
@@ -76,24 +83,29 @@ class FeatureEngine:
 
     @staticmethod
     def build_ml_feature_matrix(
-        df: pd.DataFrame,
-        n_lags: int = 5,
-        target_horizon: int = 1
-    ) -> Tuple[pd.DataFrame, pd.Series, List[str]]:
+        df: pd.DataFrame, n_lags: int = 5, target_horizon: int = 1
+    ) -> tuple[pd.DataFrame, pd.Series, list[str]]:
         features_df = FeatureEngine.compute_all_features(df).copy()
 
-        feature_cols: List[str] = []
+        feature_cols: list[str] = []
         for i in range(1, n_lags + 1):
             col_name = f"Lag_Return_{i}"
             features_df[col_name] = features_df["Log_Return"].shift(i)
             feature_cols.append(col_name)
 
         core_features = [
-            "RSI", "MACD_Hist", "BB_PctB", "BB_Bandwidth",
-            "ATR_Pct", "Realized_Vol_20", "Vol_Ratio"
+            "RSI",
+            "MACD_Hist",
+            "BB_PctB",
+            "BB_Bandwidth",
+            "ATR_Pct",
+            "Realized_Vol_20",
+            "Vol_Ratio",
         ]
-        
-        features_df["Dist_EMA_21"] = (features_df["Close"] - features_df["EMA_21"]) / (features_df["EMA_21"] + 1e-6)
+
+        features_df["Dist_EMA_21"] = (features_df["Close"] - features_df["EMA_21"]) / (
+            features_df["EMA_21"] + 1e-6
+        )
         core_features.append("Dist_EMA_21")
 
         for col in core_features:
@@ -104,7 +116,7 @@ class FeatureEngine:
         features_df["Target_Return"] = np.log(future_close / features_df["Close"])
 
         clean_ml_df = features_df.dropna(subset=feature_cols + ["Target_Return"])
-        
+
         X = clean_ml_df[feature_cols]
         y = clean_ml_df["Target_Return"]
 
